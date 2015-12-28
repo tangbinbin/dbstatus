@@ -2,3 +2,4 @@
 .idea/
 src/github.com/
 bin/
+pkg/
