@@ -11,12 +11,11 @@ dbstatus
 - ./bin/dbstatus 为可执行文件，可拷贝到可连接数据库的地方
 
 ### 使用举例
-    -P=3306: port
-    -h="127.0.0.1": host
+    -h="127.0.0.1:3306": host
     -p="test": password
     -u="test": user
 
-    ./dbstatus -u=monitor -p=w123456 -h=127.0.0.1 -P=3306
+    ./dbstatus -u=monitor -p=w123456 -h=127.0.0.1:3306
     - 预期结果
     ________________________________________________________________________________
     --------|            --QPS--            | --Innodb Rows Status-- |     --Thead--

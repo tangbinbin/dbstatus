@@ -12,8 +12,7 @@ import (
 )
 
 var (
-	host     = flag.String("h", "127.0.0.1", "host")
-	port     = flag.Int("P", 3306, "port")
+	host     = flag.String("h", "127.0.0.1:3306", "host")
 	user     = flag.String("u", "test", "user")
 	password = flag.String("p", "test", "password")
 )
@@ -24,8 +23,8 @@ func init() {
 
 func main() {
 	db, e := sql.Open("mysql",
-		fmt.Sprintf("%s:%s@tcp(%s:%d)/information_schema",
-			*user, *password, *host, *port))
+		fmt.Sprintf("%s:%s@tcp(%s)/information_schema",
+			*user, *password, *host))
 	if e != nil {
 		log.Fatal(e)
 		return
@@ -116,7 +115,7 @@ func main() {
 	}
 	state := new(status)
 	var t int = 0
-	for {
+	for range time.NewTicker(time.Second).C {
 		switch t % 15 {
 		case 0:
 			fmt.Println(strings.Repeat("_", 80))
@@ -125,11 +124,9 @@ func main() {
 			fmt.Println(fmt.Sprintf("  time  |%5s%6s%6s%7s%7s|%5s%6s%6s%7s|%4s%5s%5s",
 				"ins", "upd", "del", "sel", "qps", "ins", "upd", "del", "read", "run", "con", "cre"))
 			go handler(state, db)
-			time.Sleep(time.Second)
 			t++
 		default:
 			go handler(state, db)
-			time.Sleep(time.Second)
 			t++
 		}
 	}
