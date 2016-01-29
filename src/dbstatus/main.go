@@ -7,6 +7,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"log"
 	"os"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -40,6 +41,7 @@ type Server struct {
 }
 
 func main() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
 	addrs := strings.Split(*host, ",")
 	servers := make(map[string]*Server)
 	for _, addr := range addrs {
