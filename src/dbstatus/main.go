@@ -128,9 +128,15 @@ func main() {
 		fmt.Println(fmt.Sprintf("%21s %s|%5d%6d%6d%7d%7d|%5d%6d%6d%7d|%4d%5d%5d",
 			addr, timeNow, ins, upd, del, sel, qps, rin, rup, rdel, rre, run, con, cre))
 	}
-	var t int = 0
+	var (
+		t int = 0
+		j int = 5
+	)
+	if len(servers) == 1 {
+		j = 15
+	}
 	for range time.NewTicker(time.Second).C {
-		switch t % 5 {
+		switch t % j {
 		case 0:
 			fmt.Println("    ", strings.Repeat("_", 98))
 			fmt.Println(fmt.Sprintf("                              |%19s%12s| %s |%12s--",
