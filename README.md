@@ -4,6 +4,7 @@ dbstatus
 
 ### 功能介绍
 - 输出一个或多个mysql的qps，conn，innodb rows reads delete 等信心，每秒输出一次
+- golang1.5
 
 ### 使用说明
 - git clone https://github.com/tangbinbin/dbstatus.git
