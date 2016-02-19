@@ -6,7 +6,6 @@ import (
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
 	"log"
-	"os"
 	"runtime"
 	"strings"
 	"time"
@@ -37,9 +36,29 @@ type Info struct {
 	byteSent     uint64
 }
 
+type State struct {
+	qps  uint64
+	sel  uint64
+	ins  uint64
+	upd  uint64
+	del  uint64
+	rin  uint64
+	rre  uint64
+	rup  uint64
+	rdel uint64
+	con  uint64
+	cre  uint64
+	run  uint64
+	recv uint64
+	send uint64
+}
+
 type Server struct {
-	conn *sql.DB
-	info *Info
+	addr    string
+	conn    *sql.DB
+	info    *Info
+	state   *State
+	timeNow string
 }
 
 func main() {
@@ -59,116 +78,116 @@ func main() {
 			return
 		}
 		server := &Server{
-			conn: db,
-			info: new(Info),
+			addr:  addr,
+			conn:  db,
+			info:  &Info{},
+			state: &State{},
 		}
 
 		servers[addr] = server
 	}
 
-	handler := func(addr string, sta *Info, db *sql.DB) {
-		ssql := "show global status where variable_name in " +
-			"('Questions', 'Com_select', 'Com_update', " +
-			"'Com_insert', 'Com_delete', 'Threads_connected', " +
-			"'Threads_created', 'Threads_running', " +
-			"'Innodb_rows_inserted', 'Innodb_rows_read', " +
-			"'Innodb_rows_updated', 'Innodb_rows_deleted', " +
-			"'Bytes_received','Bytes_sent')"
-		rows, e := db.Query(ssql)
-		if e != nil {
-			log.Fatal(e)
-			os.Exit(1)
-		}
-		var qps, sel, ins, upd, del, rre, rin, rup, rdel, con, cre, run, recv, send uint64
-		for rows.Next() {
-			var (
-				key   string
-				value uint64
-			)
-			if err := rows.Scan(&key, &value); err != nil {
-				return
-			}
-			switch key {
-			case "Bytes_received":
-				recv = (value - sta.byteReceive) / 1000
-				sta.byteReceive = value
-			case "Bytes_sent":
-				send = (value - sta.byteSent) / 1000
-				sta.byteSent = value
-			case "Com_delete":
-				del = value - sta.comDelete
-				sta.comDelete = value
-			case "Com_insert":
-				ins = value - sta.comInsert
-				sta.comInsert = value
-			case "Questions":
-				qps = value - sta.questions
-				sta.questions = value
-			case "Com_update":
-				upd = value - sta.comUpdate
-				sta.comUpdate = value
-			case "Com_select":
-				sel = value - sta.comSelect
-				sta.comSelect = value
-			case "Innodb_rows_inserted":
-				rin = value - sta.rowsInsert
-				sta.rowsInsert = value
-			case "Innodb_rows_read":
-				rre = value - sta.rowsSelect
-				sta.rowsSelect = value
-			case "Innodb_rows_updated":
-				rup = value - sta.rowsUpdate
-				sta.rowsUpdate = value
-			case "Innodb_rows_deleted":
-				rdel = value - sta.rowsDelete
-				sta.rowsDelete = value
-			case "Threads_connected":
-				con = value
-			case "Threads_created":
-				cre = value - sta.threadCreate
-				sta.threadCreate = value
-			case "Threads_running":
-				run = value
-			default:
+	go func() {
+		for range time.NewTicker(time.Second).C {
+			for _, s := range servers {
+				getInfo(s)
 			}
 		}
-		if qps > 100000 {
-			return
-		}
-		timeNow := strings.Split(strings.Fields(time.Now().String())[1], ".")[0]
-		fmt.Println(fmt.Sprintf("%21s %s|%5d%6d%6d%7d%7d|%5d%6d%6d%7d|%4d%5d%5d|%5dk%5dk",
-			addr, timeNow, ins, upd, del, sel, qps, rin, rup, rdel, rre, run, con, cre, recv, send))
-	}
-	var (
-		t int = 0
-		j int = 5
-	)
-	if len(servers) == 1 {
+	}()
+	time.Sleep(2 * time.Second)
+	i, j := 0, 5
+	if len(addrs) == 1 {
 		j = 15
 	}
 	for range time.NewTicker(time.Second).C {
-		switch t % j {
-		case 0:
+		if i%j == 0 {
 			fmt.Println("    ", strings.Repeat("_", 110))
-			fmt.Println(fmt.Sprintf("                              |%19s%12s| %s |%10s--  | --bytes-- ",
-				"--QPS--", " ", "--Innodb Rows Status--", "--Thead"))
-			fmt.Println(fmt.Sprintf("          addr          time  |%5s%6s%6s%7s%7s|%5s%6s%6s%7s|%4s%5s%5s|%6s%6s",
-				"ins", "upd", "del", "sel", "qps", "ins", "upd", "del", "read", "run", "con", "cre", "recv", "send"))
-			for addr, server := range servers {
-				handler(addr, server.info, server.conn)
-			}
-			if len(servers) > 1 {
-				fmt.Println()
-			}
-			t++
+			fmt.Println(fmt.Sprintf("%30s|%19s%12s| %s |%10s--  | --bytes-- ",
+				" ", "--QPS--", " ", "--Innodb Rows Status--", "--Thead"))
+			fmt.Println(fmt.Sprintf("%21s%9s|%5s%6s%6s%7s%7s|%5s%6s%6s%7s|%4s%5s%5s|%6s%6s",
+				"addr", "time", "ins", "upd", "del", "sel", "qps", "ins",
+				"upd", "del", "read", "run", "con", "cre", "recv", "send"))
+		}
+		for _, s := range servers {
+			echoState(s)
+		}
+		if j == 5 {
+			fmt.Println()
+		}
+		i++
+	}
+}
+
+func getInfo(s *Server) {
+	ssql := "show global status where variable_name in " +
+		"('Questions', 'Com_select', 'Com_update', " +
+		"'Com_insert', 'Com_delete', 'Threads_connected', " +
+		"'Threads_created', 'Threads_running', " +
+		"'Innodb_rows_inserted', 'Innodb_rows_read', " +
+		"'Innodb_rows_updated', 'Innodb_rows_deleted', " +
+		"'Bytes_received','Bytes_sent')"
+	rows, e := s.conn.Query(ssql)
+	s.timeNow = strings.Split(strings.Fields(time.Now().String())[1], ".")[0]
+	if e != nil {
+		log.Fatal(e)
+	}
+	for rows.Next() {
+		var (
+			key   string
+			value uint64
+		)
+		if err := rows.Scan(&key, &value); err != nil {
+			return
+		}
+		switch key {
+		case "Bytes_received":
+			s.state.recv = (value - s.info.byteReceive) / 1000
+			s.info.byteReceive = value
+		case "Bytes_sent":
+			s.state.send = (value - s.info.byteSent) / 1000
+			s.info.byteSent = value
+		case "Com_delete":
+			s.state.del = value - s.info.comDelete
+			s.info.comDelete = value
+		case "Com_insert":
+			s.state.ins = value - s.info.comInsert
+			s.info.comInsert = value
+		case "Questions":
+			s.state.qps = value - s.info.questions
+			s.info.questions = value
+		case "Com_update":
+			s.state.upd = value - s.info.comUpdate
+			s.info.comUpdate = value
+		case "Com_select":
+			s.state.sel = value - s.info.comSelect
+			s.info.comSelect = value
+		case "Innodb_rows_inserted":
+			s.state.rin = value - s.info.rowsInsert
+			s.info.rowsInsert = value
+		case "Innodb_rows_read":
+			s.state.rre = value - s.info.rowsSelect
+			s.info.rowsSelect = value
+		case "Innodb_rows_updated":
+			s.state.rup = value - s.info.rowsUpdate
+			s.info.rowsUpdate = value
+		case "Innodb_rows_deleted":
+			s.state.rdel = value - s.info.rowsDelete
+			s.info.rowsDelete = value
+		case "Threads_connected":
+			s.state.con = value
+		case "Threads_created":
+			s.state.cre = value - s.info.threadCreate
+			s.info.threadCreate = value
+		case "Threads_running":
+			s.state.run = value
 		default:
-			for addr, server := range servers {
-				handler(addr, server.info, server.conn)
-			}
-			if len(servers) > 1 {
-				fmt.Println()
-			}
-			t++
 		}
 	}
+}
+
+func echoState(s *Server) {
+	fmt.Println(fmt.Sprintf("%21s %s|%5d%6d%6d%7d%7d|%5d%6d%6d%7d|%4d%5d%5d|%5dk%5dk",
+		s.addr, s.timeNow, s.state.ins, s.state.upd, s.state.del, s.state.sel,
+		s.state.qps, s.state.rin, s.state.rup, s.state.rdel, s.state.rre,
+		s.state.run, s.state.con, s.state.cre, s.state.recv, s.state.send))
 }
