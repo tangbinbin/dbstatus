@@ -33,6 +33,8 @@ type Info struct {
 	rowsUpdate   uint64
 	rowsDelete   uint64
 	threadCreate uint64
+	byteReceive  uint64
+	byteSent     uint64
 }
 
 type Server struct {
@@ -70,13 +72,14 @@ func main() {
 			"'Com_insert', 'Com_delete', 'Threads_connected', " +
 			"'Threads_created', 'Threads_running', " +
 			"'Innodb_rows_inserted', 'Innodb_rows_read', " +
-			"'Innodb_rows_updated', 'Innodb_rows_deleted')"
+			"'Innodb_rows_updated', 'Innodb_rows_deleted', " +
+			"'Bytes_received','Bytes_sent')"
 		rows, e := db.Query(ssql)
 		if e != nil {
 			log.Fatal(e)
 			os.Exit(1)
 		}
-		var qps, sel, ins, upd, del, rre, rin, rup, rdel, con, cre, run uint64
+		var qps, sel, ins, upd, del, rre, rin, rup, rdel, con, cre, run, recv, send uint64
 		for rows.Next() {
 			var (
 				key   string
@@ -86,6 +89,12 @@ func main() {
 				return
 			}
 			switch key {
+			case "Bytes_received":
+				recv = (value - sta.byteReceive) / 1000
+				sta.byteReceive = value
+			case "Bytes_sent":
+				send = (value - sta.byteSent) / 1000
+				sta.byteSent = value
 			case "Com_delete":
 				del = value - sta.comDelete
 				sta.comDelete = value
@@ -127,8 +136,8 @@ func main() {
 			return
 		}
 		timeNow := strings.Split(strings.Fields(time.Now().String())[1], ".")[0]
-		fmt.Println(fmt.Sprintf("%21s %s|%5d%6d%6d%7d%7d|%5d%6d%6d%7d|%4d%5d%5d",
-			addr, timeNow, ins, upd, del, sel, qps, rin, rup, rdel, rre, run, con, cre))
+		fmt.Println(fmt.Sprintf("%21s %s|%5d%6d%6d%7d%7d|%5d%6d%6d%7d|%4d%5d%5d|%5dk%5dk",
+			addr, timeNow, ins, upd, del, sel, qps, rin, rup, rdel, rre, run, con, cre, recv, send))
 	}
 	var (
 		t int = 0
@@ -140,11 +149,11 @@ func main() {
 	for range time.NewTicker(time.Second).C {
 		switch t % j {
 		case 0:
-			fmt.Println("    ", strings.Repeat("_", 98))
-			fmt.Println(fmt.Sprintf("                              |%19s%12s| %s |%12s--",
+			fmt.Println("    ", strings.Repeat("_", 110))
+			fmt.Println(fmt.Sprintf("                              |%19s%12s| %s |%10s--  | --bytes-- ",
 				"--QPS--", " ", "--Innodb Rows Status--", "--Thead"))
-			fmt.Println(fmt.Sprintf("          addr          time  |%5s%6s%6s%7s%7s|%5s%6s%6s%7s|%4s%5s%5s",
-				"ins", "upd", "del", "sel", "qps", "ins", "upd", "del", "read", "run", "con", "cre"))
+			fmt.Println(fmt.Sprintf("          addr          time  |%5s%6s%6s%7s%7s|%5s%6s%6s%7s|%4s%5s%5s|%6s%6s",
+				"ins", "upd", "del", "sel", "qps", "ins", "upd", "del", "read", "run", "con", "cre", "recv", "send"))
 			for addr, server := range servers {
 				handler(addr, server.info, server.conn)
 			}
