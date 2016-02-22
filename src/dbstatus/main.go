@@ -7,6 +7,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"log"
 	"runtime"
+	"sort"
 	"strings"
 	"time"
 )
@@ -54,6 +55,7 @@ type State struct {
 }
 
 type Server struct {
+	id      int
 	addr    string
 	conn    *sql.DB
 	info    *Info
@@ -64,7 +66,8 @@ type Server struct {
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	addrs := strings.Split(*host, ",")
-	servers := make(map[string]*Server)
+	servers := make(map[int]*Server)
+	id := 0
 	for _, addr := range addrs {
 		db, e := sql.Open("mysql",
 			fmt.Sprintf("%s:%s@tcp(%s)/information_schema",
@@ -78,19 +81,26 @@ func main() {
 			return
 		}
 		server := &Server{
+			id:    id,
 			addr:  addr,
 			conn:  db,
 			info:  &Info{},
 			state: &State{},
 		}
 
-		servers[addr] = server
+		servers[id] = server
+		id++
 	}
+	sk := make([]int, 0)
+	for k, _ := range servers {
+		sk = append(sk, k)
+	}
+	sort.Ints(sk)
 
 	go func() {
 		for range time.NewTicker(time.Second).C {
-			for _, s := range servers {
-				getInfo(s)
+			for _, k := range sk {
+				getInfo(servers[k])
 			}
 		}
 	}()
@@ -101,21 +111,28 @@ func main() {
 	}
 	for range time.NewTicker(time.Second).C {
 		if i%j == 0 {
-			fmt.Println("    ", strings.Repeat("_", 110))
-			fmt.Println(fmt.Sprintf("%30s|%19s%12s| %s |%10s--  | --bytes-- ",
+			fmt.Println("    ", strings.Repeat("_", 107))
+			fmt.Println(fmt.Sprintf("%30s|%16s%12s| %s |%10s--  | --kbytes-- ",
 				" ", "--QPS--", " ", "--Innodb Rows Status--", "--Thead"))
-			fmt.Println(fmt.Sprintf("%21s%9s|%5s%6s%6s%7s%7s|%5s%6s%6s%7s|%4s%5s%5s|%6s%6s",
+			fmt.Println(fmt.Sprintf("%21s%9s|%5s%5s%5s%6s%7s|%5s%6s%6s%7s|%4s%5s%5s|%6s%6s",
 				"addr", "time", "ins", "upd", "del", "sel", "qps", "ins",
 				"upd", "del", "read", "run", "con", "cre", "recv", "send"))
 		}
-		for _, s := range servers {
-			echoState(s)
+		for _, k := range sk {
+			echoState(servers[k])
 		}
 		if j == 5 {
 			fmt.Println()
 		}
 		i++
 	}
+}
+
+func echoState(s *Server) {
+	fmt.Println(fmt.Sprintf("%21s %s|%5d%5d%5d%6d%7d|%5d%6d%6d%7d|%4d%5d%5d|%6d%6d",
+		s.addr, s.timeNow, s.state.ins, s.state.upd, s.state.del, s.state.sel,
+		s.state.qps, s.state.rin, s.state.rup, s.state.rdel, s.state.rre,
+		s.state.run, s.state.con, s.state.cre, s.state.recv, s.state.send))
 }
 
 func getInfo(s *Server) {
@@ -183,11 +200,4 @@ func getInfo(s *Server) {
 		default:
 		}
 	}
-}
-
-func echoState(s *Server) {
-	fmt.Println(fmt.Sprintf("%21s %s|%5d%6d%6d%7d%7d|%5d%6d%6d%7d|%4d%5d%5d|%5dk%5dk",
-		s.addr, s.timeNow, s.state.ins, s.state.upd, s.state.del, s.state.sel,
-		s.state.qps, s.state.rin, s.state.rup, s.state.rdel, s.state.rre,
-		s.state.run, s.state.con, s.state.cre, s.state.recv, s.state.send))
 }
