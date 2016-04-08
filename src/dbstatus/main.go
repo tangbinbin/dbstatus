@@ -13,9 +13,10 @@ import (
 )
 
 var (
-	host     = flag.String("h", "127.0.0.1:3306", "hosts,多个地址之间,分割")
-	user     = flag.String("u", "test", "user")
-	password = flag.String("p", "test", "password")
+	host         = flag.String("h", "127.0.0.1:3306", "hosts,多个地址之间,分割")
+	user         = flag.String("u", "test", "user")
+	password     = flag.String("p", "test", "password")
+	length   int = 0
 )
 
 func init() {
@@ -93,6 +94,10 @@ func main() {
 
 		servers[id] = server
 		id++
+
+		if len(addr) > length {
+			length = len(addr)
+		}
 	}
 	sk := make([]int, 0)
 	for k, _ := range servers {
@@ -114,20 +119,12 @@ func main() {
 	}
 	for range time.NewTicker(time.Second).C {
 		if i%j == 0 {
-			fmt.Println("    ", strings.Repeat("_", 107))
-			fmt.Println(
-				fmt.Sprintf(
-					"%30s|%16s%12s| %s |%10s--  | --kbytes-- ",
-					" ", "--QPS--", " ", "--Innodb Rows Status--", "--Thead",
-				),
-			)
-			fmt.Println(
-				fmt.Sprintf(
-					"%21s%9s|%5s%5s%5s%6s%7s|%5s%6s%6s%7s|%4s%5s%5s|%6s%6s",
-					"addr", "time", "ins", "upd", "del", "sel", "qps", "ins",
-					"upd", "del", "read", "run", "con", "cre", "recv", "send",
-				),
-			)
+			fmt.Println("\033[0;43;1m" +
+				strings.Repeat(" ", length+9) +
+				"|           --QPS--          | --Innodb Rows Status-- |  --Thread--  | --kbytes-- \033[0m")
+			fmt.Println("\033[0;32;1m" +
+				strings.Repeat(" ", length-4) +
+				"addr     time|  ins  upd  del   sel    qps|  ins   upd   del   read| run  con  cre|  recv  send")
 		}
 		for _, k := range sk {
 			echoState(servers[k])
@@ -141,13 +138,19 @@ func main() {
 
 func echoState(s *Server) {
 	fmt.Println(
-		fmt.Sprintf(
-			"%21s %s|%5d%5d%5d%6d%7d|%5d%6d%6d%7d|%4d%5d%5d|%6d%6d",
-			s.addr, s.timeNow, s.state.ins, s.state.upd, s.state.del, s.state.sel,
+		fmt.Sprintf("\033[0;34;1m%s \033[0;33;1m%s\033[0m|%5d%5d%5d%6d%7d|%5d%6d%6d%7d|%4d%5d%5d|%6d%6d",
+			tolen(s.addr), s.timeNow, s.state.ins, s.state.upd, s.state.del, s.state.sel,
 			s.state.qps, s.state.rin, s.state.rup, s.state.rdel, s.state.rre,
 			s.state.run, s.state.con, s.state.cre, s.state.recv, s.state.send,
 		),
 	)
+}
+
+func tolen(s string) string {
+	if len(s) < length {
+		return strings.Repeat(" ", length-len(s)) + s
+	}
+	return s
 }
 
 func getInfo(s *Server) {
