@@ -13,10 +13,13 @@ import (
 )
 
 var (
-	host         = flag.String("h", "127.0.0.1:3306", "hosts,多个地址之间,分割")
-	user         = flag.String("u", "test", "user")
-	password     = flag.String("p", "test", "password")
-	length   int = 0
+	host     = flag.String("h", "127.0.0.1:3306", "hosts split by,")
+	user     = flag.String("u", "test", "user")
+	password = flag.String("p", "test", "password")
+	length   int
+	head1    string
+	head2    string
+	format   string
 )
 
 func init() {
@@ -99,6 +102,18 @@ func main() {
 			length = len(addr)
 		}
 	}
+	head1 = "\033[0;46;1m" +
+		strings.Repeat(" ", length+9) +
+		"|           --QPS--          | " +
+		"--Innodb Rows Status-- |  " +
+		"--Thread--  | --kbytes-- \033[0m"
+	head2 = "\033[0;32;1m" +
+		strings.Repeat(" ", length-4) +
+		"addr     time|  ins  upd  del   " +
+		"sel    qps|  ins   upd   del   " +
+		"read| run  con  cre|  recv  send"
+	format = "\033[0;31;1m%s \033[0;33;1m%s\033[0m|" +
+		"%5d%5d%5d%6d%7d|%5d%6d%6d%7d|%4d%5d%5d|%6d%6d\n"
 	sk := make([]int, 0)
 	for k, _ := range servers {
 		sk = append(sk, k)
@@ -119,12 +134,8 @@ func main() {
 	}
 	for range time.NewTicker(time.Second).C {
 		if i%j == 0 {
-			fmt.Println("\033[0;46;1m" +
-				strings.Repeat(" ", length+9) +
-				"|           --QPS--          | --Innodb Rows Status-- |  --Thread--  | --kbytes-- \033[0m")
-			fmt.Println("\033[0;32;1m" +
-				strings.Repeat(" ", length-4) +
-				"addr     time|  ins  upd  del   sel    qps|  ins   upd   del   read| run  con  cre|  recv  send")
+			fmt.Println(head1)
+			fmt.Println(head2)
 		}
 		for _, k := range sk {
 			echoState(servers[k])
@@ -140,10 +151,23 @@ func main() {
 }
 
 func echoState(s *Server) {
-	fmt.Printf("\033[0;31;1m%s \033[0;33;1m%s\033[0m|%5d%5d%5d%6d%7d|%5d%6d%6d%7d|%4d%5d%5d|%6d%6d\n",
-		tolen(s.addr), s.timeNow, s.state.ins, s.state.upd, s.state.del, s.state.sel,
-		s.state.qps, s.state.rin, s.state.rup, s.state.rdel, s.state.rre,
-		s.state.run, s.state.con, s.state.cre, s.state.recv, s.state.send,
+	fmt.Printf(format,
+		tolen(s.addr),
+		s.timeNow,
+		s.state.ins,
+		s.state.upd,
+		s.state.del,
+		s.state.sel,
+		s.state.qps,
+		s.state.rin,
+		s.state.rup,
+		s.state.rdel,
+		s.state.rre,
+		s.state.run,
+		s.state.con,
+		s.state.cre,
+		s.state.recv,
+		s.state.send,
 	)
 }
 
