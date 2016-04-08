@@ -113,13 +113,13 @@ func main() {
 		}
 	}()
 	time.Sleep(2 * time.Second)
-	i, j := 0, 5
+	i, j, k := 0, 5, 1
 	if len(addrs) == 1 {
 		j = 15
 	}
 	for range time.NewTicker(time.Second).C {
 		if i%j == 0 {
-			fmt.Println("\033[0;43;1m" +
+			fmt.Println("\033[0;46;1m" +
 				strings.Repeat(" ", length+9) +
 				"|           --QPS--          | --Innodb Rows Status-- |  --Thread--  | --kbytes-- \033[0m")
 			fmt.Println("\033[0;32;1m" +
@@ -130,19 +130,20 @@ func main() {
 			echoState(servers[k])
 		}
 		if j == 5 {
-			fmt.Println()
+			if k%5 != 0 {
+				fmt.Println()
+			}
 		}
 		i++
+		k++
 	}
 }
 
 func echoState(s *Server) {
-	fmt.Println(
-		fmt.Sprintf("\033[0;34;1m%s \033[0;33;1m%s\033[0m|%5d%5d%5d%6d%7d|%5d%6d%6d%7d|%4d%5d%5d|%6d%6d",
-			tolen(s.addr), s.timeNow, s.state.ins, s.state.upd, s.state.del, s.state.sel,
-			s.state.qps, s.state.rin, s.state.rup, s.state.rdel, s.state.rre,
-			s.state.run, s.state.con, s.state.cre, s.state.recv, s.state.send,
-		),
+	fmt.Printf("\033[0;31;1m%s \033[0;33;1m%s\033[0m|%5d%5d%5d%6d%7d|%5d%6d%6d%7d|%4d%5d%5d|%6d%6d\n",
+		tolen(s.addr), s.timeNow, s.state.ins, s.state.upd, s.state.del, s.state.sel,
+		s.state.qps, s.state.rin, s.state.rup, s.state.rdel, s.state.rre,
+		s.state.run, s.state.con, s.state.cre, s.state.recv, s.state.send,
 	)
 }
 
