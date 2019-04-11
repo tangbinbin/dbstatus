@@ -181,7 +181,7 @@ func tolen(s string) string {
 func getInfo(s *Server) {
 	ssql := "show global status where variable_name in " +
 		"('Questions', 'Com_select', 'Com_update', " +
-		"'Com_insert', 'Com_delete', 'Threads_connected', " +
+		"'Com_insert', 'Com_delete', 'Connections', " +
 		"'Threads_created', 'Threads_running', " +
 		"'Innodb_rows_inserted', 'Innodb_rows_read', " +
 		"'Innodb_rows_updated', 'Innodb_rows_deleted', " +
@@ -235,7 +235,7 @@ func getInfo(s *Server) {
 			s.info.rowsDelete = value
 		case "Threads_connected":
 			s.state.con = value
-		case "Threads_created":
+		case "Connections":
 			s.state.cre = value - s.info.threadCreate
 			s.info.threadCreate = value
 		case "Threads_running":
