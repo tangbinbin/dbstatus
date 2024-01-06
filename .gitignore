@@ -3,3 +3,5 @@
 src/github.com/
 bin/
 pkg/
+.DS_Store
+src/.DS_Store

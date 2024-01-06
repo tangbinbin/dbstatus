@@ -1,10 +1,4 @@
 all: install
 
-GOPATH:=$(CURDIR)
-export GOPATH
-
-dep:
-	go get github.com/go-sql-driver/mysql
-
-install:dep
-	go install dbstatus
+install:
+	go build -o bin/dbstatus ./src/dbstatus
